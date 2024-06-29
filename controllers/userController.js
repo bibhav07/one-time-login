@@ -4,6 +4,7 @@ const OtpModel = require("../models/otp");
 const jwt = require('jsonwebtoken');
 const { validationResult }  = require('express-validator');
 const {sendMail} = require('../helpers/mailer');
+const { checkOtpIsExpired } = require('../helpers/otpValidate');
 
 const registerUser = async(req, res)=>{
 
@@ -91,7 +92,33 @@ const loginUser = async (req, res) => {
         const passwordMatch = await bcrypt.compare(password, userData.password);
         if(!passwordMatch){
             return res.status(401).json({success:false, msg:'Email and Password is Incorrect!' });
+        };
+
+
+        const otpData = await OtpModel.findOne({
+            user_id : userData._id
+        });
+
+        if(otpData && otpData.is_verified  != true){
+            const isOtpExpired = await checkOtpIsExpired(otpData.timestamp);
+            if(!isOtpExpired){
+            const accessToken = await generateAccessToken ({user:userData });
+            const refreshToken = await generateRefreshToken ({user:userData });
+
+            return res.status(201).json({
+                success:true, 
+                otpSent:false,
+                msg:'Login Successfully!', 
+                user: userData,
+                accessToken: accessToken,
+                refreshToken: refreshToken,
+                tokenType:'Bearer'
+            });
+
+
+            }   
         }
+
 
         const g_otp = await generateOtp();
         const cDate  = new Date();
@@ -111,17 +138,6 @@ const loginUser = async (req, res) => {
             msg:'Login OTP has been sent to your mail!', 
         });
 
-        // const accessToken = await generateAccessToken ({user:userData });
-        // const refreshToken = await generateRefreshToken ({user:userData });
-
-        // return res.status(201).json({
-        //     success:true, 
-        //     msg:'Login Successfully!', 
-        //     user: userData,
-        //     accessToken: accessToken,
-        //     refreshToken: refreshToken,
-        //     tokenType:'Bearer'
-        // });
 
     } catch (error) {
         return res.status(400).json({
