@@ -32,3 +32,9 @@ exports.loginValidator = [
     }),
     check('password', 'Password is required').not().isEmpty(),
 ];
+exports.verifyOtpValidator = [
+    check('user_id', 'user_id is required').not().isEmpty(),
+    check('otp', 'otp is required').not().isEmpty(),
+];
+
+

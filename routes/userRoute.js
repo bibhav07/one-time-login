@@ -33,10 +33,12 @@ const upload = multer({
 });
 
 const userController = require('../controllers/userController');
-const { registerValidator, loginValidator } = require('../helpers/validation');
+const { registerValidator, loginValidator, verifyOtpValidator } = require('../helpers/validation');
 
 router.post ("/register",upload.single('image'), registerValidator, userController.registerUser);
 
 router.post("/login", loginValidator, userController.loginUser);
+
+router.post("/verify-otp", verifyOtpValidator, userController.verifyOtp);
 
 module.exports = router;

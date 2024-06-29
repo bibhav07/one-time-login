@@ -99,7 +99,7 @@ const loginUser = async (req, res) => {
             user_id : userData._id
         });
 
-        if(otpData && otpData.is_verified  != true){
+        if(otpData && otpData.is_verified  != false){
             const isOtpExpired = await checkOtpIsExpired(otpData.timestamp);
             if(!isOtpExpired){
             const accessToken = await generateAccessToken ({user:userData });
@@ -135,6 +135,7 @@ const loginUser = async (req, res) => {
         return res.status(201).json({
             success:true, 
             otpSent: true,
+            user_id : userData._id,
             msg:'Login OTP has been sent to your mail!', 
         });
 
@@ -146,9 +147,76 @@ const loginUser = async (req, res) => {
         });
     }
 
+};
+
+const verifyOtp = async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if(!errors.isEmpty()){
+            return res.status(400).json({
+                success:false,
+                msg:'Errors',
+                errors:errors.array()
+            });    
+        };
+
+       const {user_id, otp} = req.body;
+       
+       const otpData = await OtpModel.findOne({
+        user_id,
+        otp,
+        is_verified:false
+       });
+
+       if(!otpData){
+           return res.status(200).json({
+               success:false,
+               msg:'Wrong otp entered!'
+           });
+       }
+
+       const isOtpExpired = await checkOtpIsExpired(otpData.timestamp);
+
+       if(isOtpExpired){
+        return res.status(200).json({
+            success:false,
+            msg:'Otp is expired!'
+        });
+       }
+
+       await OtpModel.findByIdAndUpdate({_id: otpData._id},{
+        $set: {
+            is_verified: true
+        }
+       });
+
+       const userData = await User.findOne({ _id: otpData.user_id });
+
+       const accessToken = await generateAccessToken ({user:userData });
+       const refreshToken = await generateRefreshToken ({user:userData });
+
+       return res.status(201).json({
+           success:true, 
+           msg:'Login Successfully!', 
+           user: userData,
+           accessToken: accessToken,
+           refreshToken: refreshToken,
+           tokenType:'Bearer'
+       });
+
+
+
+    } catch (error) {
+
+        return res.status(400).json({
+            success:false,
+            msg:error.message
+        });
+    }
 }
 
 module.exports = {
     registerUser,
-    loginUser
+    loginUser,
+    verifyOtp
 }
