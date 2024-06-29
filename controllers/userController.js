@@ -1,7 +1,9 @@
 const bcrypt = require ('bcrypt');
 const User = require('../models/userModel');
+const OtpModel = require("../models/otp");
 const jwt = require('jsonwebtoken');
 const { validationResult }  = require('express-validator');
+const {sendMail} = require('../helpers/mailer');
 
 const registerUser = async(req, res)=>{
 
@@ -59,6 +61,12 @@ const generateRefreshToken = async(user) => {
     return token;
 }
 
+const generateOtp = async () => {
+    const otp = Math.floor(100000 + Math.random() * 900000);
+    return otp.toString();
+}
+
+
 const loginUser = async (req, res) => {
 
     try{
@@ -85,17 +93,35 @@ const loginUser = async (req, res) => {
             return res.status(401).json({success:false, msg:'Email and Password is Incorrect!' });
         }
 
-        const accessToken = await generateAccessToken ({user:userData });
-        const refreshToken = await generateRefreshToken ({user:userData });
+        const g_otp = await generateOtp();
+        const cDate  = new Date();
+
+        await OtpModel.findOneAndUpdate(
+            {user_id: userData._id},
+            {otp: g_otp, is_verified: false, timestamp:new Date(cDate.getTime())},
+            {new: true, upsert: true, setDefaultsOnInsert: true}
+        )
+
+        const html = `<p>Hii, '${userData.name}' <br> Your login OTP is <b>'${g_otp}'</b> </p>`
+        sendMail(userData.email, 'Login OTP', html)
 
         return res.status(201).json({
             success:true, 
-            msg:'Login Successfully!', 
-            user: userData,
-            accessToken: accessToken,
-            refreshToken: refreshToken,
-            tokenType:'Bearer'
+            otpSent: true,
+            msg:'Login OTP has been sent to your mail!', 
         });
+
+        // const accessToken = await generateAccessToken ({user:userData });
+        // const refreshToken = await generateRefreshToken ({user:userData });
+
+        // return res.status(201).json({
+        //     success:true, 
+        //     msg:'Login Successfully!', 
+        //     user: userData,
+        //     accessToken: accessToken,
+        //     refreshToken: refreshToken,
+        //     tokenType:'Bearer'
+        // });
 
     } catch (error) {
         return res.status(400).json({
